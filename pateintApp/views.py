@@ -338,6 +338,34 @@ def get_patient_byid(request):
 
         return Response(response_data,status=status.HTTP_200_OK)
 
+# @api_view(["POST"])
+# def get_patient_details_by_phone(request):
+#     debug = []
+#     response_data = {
+#         'message_code': 999,
+#         'message_text': 'Functional part is commented.',
+#         'message_data': [],
+#         'message_debug': debug
+#     }
+
+#     phone_number = request.data.get('phone_number', None)
+
+#     if not phone_number:
+#         response_data = {'message_code': 999, 'message_text': 'Phone number is required.'}
+#     else:
+#         try:
+#             patient = Tblpatients.objects.get(patient_mobileno=phone_number)
+#             serializer = TblPatientsSerializer(patient)
+#             response_data = {
+#                 'message_code': 1000,
+#                 'message_text': 'Patient details fetched successfully.',
+#                 'message_data': serializer.data,
+#                 'message_debug': debug
+#             }
+#         except Tblpatients.DoesNotExist:
+#             response_data = {'message_code': 999, 'message_text': 'Patient not found.', 'message_debug': debug}
+
+#     return Response(response_data, status=status.HTTP_200_OK)
 @api_view(["POST"])
 def get_patient_details_by_phone(request):
     debug = []
@@ -354,19 +382,38 @@ def get_patient_details_by_phone(request):
         response_data = {'message_code': 999, 'message_text': 'Phone number is required.'}
     else:
         try:
-            patient = Tblpatients.objects.get(patient_mobileno=phone_number)
-            serializer = TblPatientsSerializer(patient)
-            response_data = {
-                'message_code': 1000,
-                'message_text': 'Patient details fetched successfully.',
-                'message_data': serializer.data,
-                'message_debug': debug
-            }
-        except Tblpatients.DoesNotExist:
-            response_data = {'message_code': 999, 'message_text': 'Patient not found.', 'message_debug': debug}
+            # Get all patients with the given phone number
+            patients = Tblpatients.objects.filter(patient_mobileno=phone_number)
+
+            if not patients.exists():
+                response_data = {'message_code': 999, 'message_text': 'Patient not found.', 'message_debug': debug}
+                return Response(response_data, status=status.HTTP_200_OK)
+
+            if patients.count() == 1:
+                # If only one patient is found, return it directly
+                patient = patients.first()
+            else:
+                # If multiple patients exist, apply the filtering condition
+                patient = patients.filter(Q(follower__isnull=True) | Q(follower=0)).first()
+
+                if not patient:
+                    patient = patients.filter(follower=1).first()
+
+            if patient:
+                serializer = TblPatientsSerializer(patient)
+                response_data = {
+                    'message_code': 1000,
+                    'message_text': 'Patient details fetched successfully.',
+                    'message_data': serializer.data,
+                    'message_debug': debug
+                }
+            else:
+                response_data = {'message_code': 999, 'message_text': 'Patient not found.', 'message_debug': debug}
+
+        except Exception as e:
+            response_data = {'message_code': 999, 'message_text': str(e), 'message_debug': debug}
 
     return Response(response_data, status=status.HTTP_200_OK)
-
 
 ##########################patient selection##########################
 @api_view(["POST"])
